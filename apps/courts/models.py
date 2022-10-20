@@ -1,4 +1,5 @@
 from django.db import models
+from traitlets import default
 
 
 class Court(models.Model):
@@ -41,11 +42,8 @@ class Jurisdiction(models.Model):
                                   verbose_name='Район, населенный пункт')
     street = models.CharField(max_length=250, null=True,
                               verbose_name='микрорайон, улица, прочие адресные указатели')
-    house_number = models.CharField(max_length=6, null=True,
-                                    verbose_name='номер дома, если в подсудность входят единичные дома')
-
-    start_house_number = models.CharField(max_length=6, null=True,
-                                          verbose_name='номер дома начала интервала')
-    end_house_number = models.CharField(max_length=6, null=True, verbose_name='номер дома конца интервала')
+    house_number = models.CharField(null=True, max_length=6, verbose_name='номер дома, если в подсудность входят единичные дома')
+    start_house_number = models.CharField(null=True, max_length=6, verbose_name='номер дома начала интервала')
+    end_house_number = models.CharField(null=True, max_length=6, verbose_name='номер дома конца интервала')
     parity = models.CharField(max_length=2, null=True)
     excluded_houses = models.CharField(max_length=250, null=True)

@@ -1,6 +1,8 @@
+from tkinter import EXCEPTION
 from django.conf import settings
 
 from .models import Court, Jurisdiction
+from .utils import get_digits, get_range
 
 from bs4 import BeautifulSoup as Bs
 
@@ -12,7 +14,7 @@ class Service:
     base_url = 'https://mirsud.spb.ru/court-sites/{}/'
 
     @staticmethod
-    def create_court(data: dict) -> Court:
+    def create_court(data: dict, url: str) -> Court:
         court, created = Court.objects.get_or_create(name_judicial_precinct=data['name'])
 
         court.address = data['address']
@@ -22,17 +24,18 @@ class Service:
         court.region = 'Санкт-Петербург'
         court.judge_email = data['email']
         court.district = data['district']
+        court.site = url
 
         try:
             phones = data['phone']
             court.type_phone_1 = 'Телефон'
-            court.phone_1 = phones[0]
+            court.phone_1 = get_digits(phones[0])
 
             court.type_phone_2 = 'Факс'
-            court.phone_2 = phones[1]
+            court.phone_2 = get_digits(phones[1])
         except IndexError:
             court.type_phone_1 = 'Телефон'
-            court.phone_1 = data['phone'][0]
+            court.phone_1 = get_digits(data['phone'][0])
 
         court.save()
         return court
@@ -40,42 +43,16 @@ class Service:
     @staticmethod
     def create_jurisdictions(data: list, court: Court):
         objects = []
-        for i in data:
+        for podsud in data:
             try:
-                street = i[0]
-                if i[1] == 'нечетные: все':
-
-                    start = '1'
-                    end = '2000'
-                    parity = '0'
-
-                else:
-                    interval = i[1].split(' ')[1].split('-')
-                    start = interval[0]
-                    end = interval[1]
-                    parity = '-1'
-
-                objects.append(Jurisdiction(court=court,
-                                            district=court.district,
-                                            street=street,
-                                            start_house_number=start,
-                                            end_house_number=end,
-                                            parity=parity))
-
-                if i[2]:
-                    interval = i[2].split(' ')[1].split('-')
-                    start = interval[0]
-                    end = interval[1]
-                    parity = '1'
-
-                    objects.append(Jurisdiction(
-                        court=court,
-                        district=court.district,
-                        street=street,
-                        start_house_number=start,
-                        end_house_number=end,
-                        parity=parity
-                    ))
+                street = podsud[0]
+                obj1 = get_range(podsud[1], court, street)
+                obj2 = get_range(podsud[2], court, street)        
+                if obj1:
+                    objects.append(obj1)
+                if obj2:
+                    objects.append(obj2)
+                    
             except IndexError:
                 continue
 
@@ -84,10 +61,10 @@ class Service:
     @staticmethod
     def get_court_data_from_html(soup: Bs) -> dict:
         data = {}
-
+        phone = soup.find('div', class_='telfax').find('p').text.split(',')
         data['name'] = soup.find('main').find('h1').text
         data['address'] = soup.find('div', class_='adress-fact').find('p').text
-        data['phone'] = soup.find('div', class_='telfax').find('p').text.split(',')
+        data['phone'] = phone
         try:
             data['email'] = soup.find('a', class_='link__mail').text.replace(' ', '')
         except AttributeError:
@@ -159,12 +136,13 @@ class Service:
 
     def get_content(self):
         for page in range(1, 250):
-            page = requests.get(self.base_url.format(f'{page}'))
+            url = self.base_url.format(f'{page}')
+            page = requests.get(url)
             soup = Bs(page.text, 'html.parser')
 
             # Данные по судебному участку
             court_data = self.get_court_data_from_html(soup)
-            court = self.create_court(court_data)
+            court = self.create_court(court_data, url)
 
             # Данные по территориальной подсудности
             jurisdiction = self.get_jurisdiction_data_from_html(soup)
