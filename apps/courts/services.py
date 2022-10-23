@@ -15,6 +15,8 @@ class Service:
 
     @staticmethod
     def create_court(data: dict, url: str) -> Court:
+        print(data)
+
         court, created = Court.objects.get_or_create(name_judicial_precinct=data['name'])
 
         court.address = data['address']
@@ -25,6 +27,7 @@ class Service:
         court.judge_email = data['email']
         court.district = data['district']
         court.site = url
+        court.secretary_court_session = data['secretary_court_session']
 
         try:
             phones = data['phone']
@@ -60,26 +63,42 @@ class Service:
 
     @staticmethod
     def get_court_data_from_html(soup: Bs) -> dict:
-        data = {}
         phone = soup.find('div', class_='telfax').find('p').text.split(',')
-        data['name'] = soup.find('main').find('h1').text
-        data['address'] = soup.find('div', class_='adress-fact').find('p').text
-        data['phone'] = phone
+
+        data = {
+            'name': soup.find('main').find('h1').text,
+            'address': soup.find('div', class_='adress-fact').find('p').text,
+            'phone': phone,
+            'clerk_name': '',
+            'secretary_court_session': '',
+            'assistant_name': '',
+            'judge_name': '',
+        }
+       
         try:
             data['email'] = soup.find('a', class_='link__mail').text.replace(' ', '')
         except AttributeError:
             data['email'] = ''
 
         about_sector = soup.find('article', class_='about-sector').findAll('p')
-        data['judge_name'] = about_sector[0].text
-        try:
-            data['clerk_name'] = about_sector[1].text
-            data['assistant_name'] = about_sector[2].text
-            data['district'] = about_sector[3].text
-        except IndexError:
-            data['clerk_name'] = ''
-            data['assistant_name'] = ''
-            data['district'] = ''
+        about_sector_titles = soup.find('article', class_='about-sector').findAll('b')
+
+        for b in range(len(about_sector_titles)):
+            text = about_sector_titles[b].text
+            if text == 'Судья':
+                data['judge_name'] = about_sector[b].text
+            if text == 'Секретарь суда':
+                data['clerk_name'] = about_sector[b].text
+            
+            if text == 'Секретарь судебного заседания':
+                data['secretary_court_session'] = about_sector[b].text
+            
+            if text == 'Помощник мирового судьи':
+                data['assistant_name'] = about_sector[b].text
+            
+            if text == 'Район':
+                print(about_sector[b])
+                data['district'] = about_sector[b].text
         return data
 
     @staticmethod
@@ -150,7 +169,7 @@ class Service:
             self.create_jurisdictions(jurisdiction, court)
 
     def get_xlsx(self):
-        workbook = xlsxwriter.Workbook(f'{settings.BASE_DIR}/xlsx/data.xlsx')
+        workbook = xlsxwriter.Workbook(f'{settings.BASE_DIR}/xlsx/spb_data.xlsx')
 
         courts = self.write_courts_sheet(workbook)
         jurisdiction = self.write_jurisdictions_sheet(workbook)

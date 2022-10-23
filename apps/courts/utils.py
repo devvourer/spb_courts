@@ -5,18 +5,35 @@ def get_digits(string: str) -> str:
     return digits
 
 def jurisdiction(court, street, parity, start=None, end=None, house_number=None):
-    if not house_number:
-        return Jurisdiction(court=court,
-                            street=street,
-                            start_house_number=start,
-                            end_house_number=end,
-                            parity=parity
-                            )
-    else:
-        return Jurisdiction(court=court,
-                            street=street,
-                            house_number=house_number,
-                            parity=parity)
+    try:
+        if not house_number:
+            jurisdiction = Jurisdiction.objects.get(court=court,
+                                                    street=street,
+                                                    start_house_number=start,
+                                                    end_house_number=end,
+                                                    parity=parity
+                                                    )
+        else:
+            jurisdiction = Jurisdiction.objects.get(court=court,
+                                                    street=street,
+                                                    house_number=house_number,
+                                                    parity=parity)
+
+        return jurisdiction
+    except Jurisdiction.DoesNotExist:
+        if not house_number:
+            return Jurisdiction(court=court,
+                                street=street,
+                                start_house_number=start,
+                                end_house_number=end,
+                                parity=parity
+                                )
+        else:
+            return Jurisdiction(court=court,
+                                street=street,
+                                house_number=house_number,
+                                parity=parity)
+
 
 # todo: Очень подумать над реализацией еще раз
 def get_range(data: str, court: Court, street):
